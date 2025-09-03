@@ -1,0 +1,95 @@
+<div align="center"> 
+<br> 
+<br>
+<img src="./src/assets/icons/ic-logo-badge.svg" height="140" />
+<h3> Awaz-e-Talba </h3>
+  <p>
+    <p style="font-size: 14px">
+      Awaz-e-Talba is a student voice platform built with React 19, Vite, shadcn/ui, and TypeScript. It provides students with a modern interface to express their concerns and feedback.
+    </p>
+    <br />
+    <br />
+</div>
+
+**English** | [中文](./README.zh-CN.md)
+
+## Sponsor
+
+<div style="display: flex; gap: 50px"> 
+  <img style="width:300px" src="https://d3george.github.io/github-static/pay/weixin.jpg" >
+  <img style="width:300px" src="https://d3george.github.io/github-static/pay/buymeacoffee.png" />
+</div>
+
+## Preview
+
+- https://admin.slashspaces.com/
+
+| ![login.png](https://d3george.github.io/github-static/slash-admin/sa-web-light.jpeg)       | ![login_dark.png](https://d3george.github.io/github-static/slash-admin/sa-web-dark.jpeg)   |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| ![analysis.png](https://d3george.github.io/github-static/slash-admin/sa-mobile-light.jpeg) | ![workbench.png](https://d3george.github.io/github-static/slash-admin/sa-mobile-dark.jpeg) |
+|                                                                                            |
+
+## Features
+
+- Built using React 19 hooks.
+- Powered by Vite for rapid development and hot module replacement.
+- Integrates shadcn/ui, providing a rich set of UI components and design patterns.
+- Written in TypeScript, offering type safety and an improved development experience.
+- Responsive design, adapting to various screen sizes and devices.
+- Flexible routing configuration, supporting nested routes.
+- Integrated access control based on user roles.
+- Supports internationalization for easy language switching.
+- Includes common admin features like user management, role management, and permission management.
+- Customizable themes and styles to meet your branding needs.
+- Mocking solution based on MSW and Faker.js.
+- State management using Zustand.
+- Data fetching using React-Query.
+
+## Quick Start
+
+### Get the Project Code
+
+```bash
+git clone https://github.com/d3george/slash-admin.git
+```
+
+### Install Dependencies
+
+In the project's root directory, run the following command to install project dependencies:
+
+```bash
+pnpm install
+```
+
+### Start the Development Server
+
+Run the following command to start the development server:
+
+```bash
+pnpm dev
+```
+
+Visit [http://localhost:3001](http://localhost:3001) to view your application.
+
+### Build for Production
+
+Run the following command to build the production version:
+
+```bash
+pnpm build
+```
+
+## Git Contribution submission specification
+
+- `feat` new features
+- `fix` fix the
+- `docs` documentation or comments
+- `style` code format (changes that do not affect code execution)
+- `refactor` refactor
+- `perf` performance optimization
+- `revert` revert commit
+- `test` test related
+- `chore` changes in the construction process or auxiliary tools
+- `ci` modify CI configuration and scripts
+- `types` type definition file changes
+- `wip` in development

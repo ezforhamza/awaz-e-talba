@@ -1,0 +1,18 @@
+# Netlify redirects file for React SPA
+# This ensures that all routes are handled by React Router
+
+# Handle all routes by serving index.html
+/*    /index.html   200
+
+# API routes (if you have any backend APIs)
+/api/*  https://your-backend-url.com/api/:splat  200
+
+# Supabase functions (if needed)
+/functions/*  https://your-project.supabase.co/functions/v1/:splat  200
+
+# Security headers (optional)
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
