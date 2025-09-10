@@ -1,110 +1,106 @@
-import { useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { updateElectionSchedules } from "@/services/electionScheduler";
 
 export const useElectionAutoUpdater = () => {
-  const queryClient = useQueryClient()
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const channelRef = useRef<any>(null)
+	const queryClient = useQueryClient();
+	const channelRef = useRef<any>(null);
+	const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    // Set up realtime subscription for election changes
-    channelRef.current = supabase
-      .channel('election-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'elections'
-        },
-        (payload) => {
-          // Invalidate relevant queries to refresh the UI immediately
-          queryClient.invalidateQueries({ queryKey: ['elections'] })
-          queryClient.invalidateQueries({ queryKey: ['active-elections'] })
-          
-          // Show toast notification for status changes
-          const { new: newElection, old: oldElection } = payload
-          if (newElection.status !== oldElection.status) {
-            const statusMessages = {
-              active: `🟢 "${newElection.title}" election is now active!`,
-              completed: `✅ "${newElection.title}" election has ended.`,
-              cancelled: `❌ "${newElection.title}" election was cancelled.`
-            }
-            
-            const message = statusMessages[newElection.status as keyof typeof statusMessages]
-            if (message) {
-              toast.success(message)
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'elections'
-        },
-        (payload) => {
-          queryClient.invalidateQueries({ queryKey: ['elections'] })
-          
-          const election = payload.new as any
-          toast.success(`🗳️ New election created: "${election.title}"`)
-        }
-      )
-      .subscribe()
+	useEffect(() => {
+		// Set up realtime subscription for election changes
+		channelRef.current = supabase
+			.channel("election-realtime-updates")
+			.on(
+				"postgres_changes",
+				{
+					event: "UPDATE",
+					schema: "public",
+					table: "elections",
+				},
+				(payload) => {
+					// Invalidate relevant queries to refresh the UI immediately
+					queryClient.invalidateQueries({ queryKey: ["elections"] });
+					queryClient.invalidateQueries({ queryKey: ["active-elections"] });
 
-    // Set up periodic auto-update check (every 15 seconds for more responsiveness)
-    const runAutoUpdate = async () => {
-      try {
-        const { error } = await supabase.rpc('auto_update_election_status')
-        if (error) {
-          console.error('Auto-update error:', error)
-        }
-      } catch (error) {
-        console.error('Failed to run auto-update:', error)
-      }
-    }
+					// Show toast notification for status changes
+					const { new: newElection, old: oldElection } = payload;
+					if (newElection.status !== oldElection.status) {
+						const statusMessages = {
+							active: `🟢 Election "${newElection.title}" is now active`,
+							completed: `✅ Election "${newElection.title}" has been completed`,
+							archived: `📁 Election "${newElection.title}" has been archived`,
+							draft: `📝 Election "${newElection.title}" is back to draft`,
+						};
 
-    // Run immediately
-    runAutoUpdate()
+						const message = statusMessages[newElection.status as keyof typeof statusMessages];
+						if (message) {
+							toast.success(message);
+						}
+					}
+				},
+			)
+			.on(
+				"postgres_changes",
+				{
+					event: "INSERT",
+					schema: "public",
+					table: "elections",
+				},
+				(payload) => {
+					queryClient.invalidateQueries({ queryKey: ["elections"] });
 
-    // Then run every 15 seconds
-    intervalRef.current = setInterval(runAutoUpdate, 15000)
+					const election = payload.new as any;
+					toast.success(`🗳️ New election created: "${election.title}"`);
+				},
+			)
+			.subscribe();
 
-    return () => {
-      // Cleanup
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-      if (channelRef.current) {
-        channelRef.current.unsubscribe()
-      }
-    }
-  }, [queryClient])
+		// Set up periodic auto-scheduling check (every minute)
+		const runSchedulerCheck = async () => {
+			try {
+				const result = await updateElectionSchedules();
 
-  // Manual trigger function
-  const triggerUpdate = async () => {
-    try {
-      const { data, error } = await supabase.rpc('auto_update_election_status')
-      if (error) throw error
-      
-      if (data && data > 0) {
-        queryClient.invalidateQueries({ queryKey: ['elections'] })
-        queryClient.invalidateQueries({ queryKey: ['active-elections'] })
-        return { success: true, updated: data }
-      }
-      
-      return { success: true, updated: 0 }
-    } catch (error) {
-      console.error('Manual trigger failed:', error)
-      return { success: false, error: error.message }
-    }
-  }
+				// Show toast notifications for auto-started/completed elections
+				if (result.started > 0) {
+					toast.success(`🟢 ${result.started} election${result.started > 1 ? "s" : ""} automatically started`);
+					queryClient.invalidateQueries({ queryKey: ["elections"] });
+				}
 
-  return {
-    triggerUpdate
-  }
-}
+				if (result.completed > 0) {
+					toast.success(`✅ ${result.completed} election${result.completed > 1 ? "s" : ""} automatically completed`);
+					queryClient.invalidateQueries({ queryKey: ["elections"] });
+				}
+
+				// Log any errors (in production, you might want to send to error tracking service)
+				result.errors.forEach((error) => {
+					console.warn("Election scheduler error:", error);
+				});
+			} catch (error) {
+				console.error("Failed to run election scheduler:", error);
+			}
+		};
+
+		// Run scheduler check immediately
+		runSchedulerCheck();
+
+		// Then run every minute
+		intervalRef.current = setInterval(runSchedulerCheck, 60000);
+
+		return () => {
+			// Cleanup
+			if (channelRef.current) {
+				supabase.removeChannel(channelRef.current);
+			}
+			if (intervalRef.current) {
+				clearInterval(intervalRef.current);
+			}
+		};
+	}, [queryClient]);
+
+	return {
+		// Return empty object since this is just a realtime subscription hook
+	};
+};

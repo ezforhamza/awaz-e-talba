@@ -1,15 +1,22 @@
 import { cn } from "@/utils";
 import { NavLink } from "react-router";
-import { Icon } from "../icon";
+import LogoImage from "@/assets/icons/logo.png";
 
 interface Props {
 	size?: number | string;
 	className?: string;
 }
 function Logo({ size = 50, className }: Props) {
+	const sizeValue = typeof size === "string" ? size : `${size}px`;
+
 	return (
 		<NavLink to="/" className={cn(className)}>
-			<Icon icon="local:ic-logo-badge" size={size} color="var(--colors-palette-primary-default)" />
+			<img
+				src={LogoImage}
+				alt="Awaz-e-Talba"
+				style={{ width: sizeValue, height: sizeValue }}
+				className="object-contain"
+			/>
 		</NavLink>
 	);
 }

@@ -1,429 +1,327 @@
-import { Icon } from "@/components/icon";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import { useElections } from "@/hooks/useElections";
-import { Badge } from "@/ui/badge";
+import { useState } from "react";
+import { ElectionForm } from "@/components/admin/ElectionForm";
+import { useElections } from "@/hooks/elections";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
-import { Input } from "@/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { useState } from "react";
-import { toast } from "sonner";
-import { useRouter } from "@/routes/hooks";
+import { Badge } from "@/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Calendar, Users, Play, Square, Edit, Trash2, Plus, ArrowLeft, Clock, Zap } from "lucide-react";
+import { format } from "date-fns";
+
+type ViewState = "list" | "create" | "edit";
 
 export default function Elections() {
-  const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    variant?: "default" | "destructive";
-  }>({
-    open: false,
-    title: "",
-    description: "",
-    onConfirm: () => {},
-  });
-  
-  const { 
-    elections, 
-    stats, 
-    isLoading, 
-    deleteElection,
-    forceStartElection,
-    stopElection,
-    isDeleting,
-    isStarting,
-    isStopping,
-    isElectionInPast,
-    canStartElection,
-    getElectionTimeStatus
-  } = useElections();
+	const [viewState, setViewState] = useState<ViewState>("list");
+	const [editingElectionId, setEditingElectionId] = useState<string | null>(null);
+	const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; election: any | null }>({
+		open: false,
+		election: null,
+	});
 
-  const filteredElections = elections.filter(election => {
-    const matchesSearch = election.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (election.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    const matchesStatus = statusFilter === "all" || election.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+	const {
+		elections,
+		isLoading,
+		deleteElection,
+		changeElectionStatus,
+		isDeleting,
+		isChangingStatus,
+		deleteError,
+		statusError,
+	} = useElections();
 
+	const handleCreateNew = () => {
+		setViewState("create");
+	};
 
+	const handleEdit = (electionId: string) => {
+		setEditingElectionId(electionId);
+		setViewState("edit");
+	};
 
-  const handleStartElection = (id: string, title: string) => {
-    setConfirmDialog({
-      open: true,
-      title: "Start Election",
-      description: `Are you sure you want to start "${title}"? This will make it available for voting.`,
-      onConfirm: async () => {
-        try {
-          await forceStartElection(id);
-          toast.success("Election started successfully!");
-        } catch (error: any) {
-          toast.error(error?.message || "Failed to start election");
-        }
-      }
-    });
-  };
+	const handleBackToList = () => {
+		setViewState("list");
+		setEditingElectionId(null);
+	};
 
-  const handleStopElection = (id: string, title: string) => {
-    setConfirmDialog({
-      open: true,
-      title: "Stop Election",
-      description: `Are you sure you want to stop "${title}"? This will end the voting process and mark it as completed.`,
-      variant: "destructive",
-      onConfirm: async () => {
-        try {
-          await stopElection(id);
-          toast.success("Election stopped successfully!");
-        } catch (error) {
-          toast.error("Failed to stop election");
-        }
-      }
-    });
-  };
+	const getStatusColor = (status: string) => {
+		switch (status) {
+			case "draft":
+				return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+			case "active":
+				return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+			case "completed":
+				return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+			case "archived":
+				return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+			default:
+				return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+		}
+	};
 
-  const handleDeleteElection = (id: string, title: string) => {
-    setConfirmDialog({
-      open: true,
-      title: "Delete Election",
-      description: `Are you sure you want to delete "${title}"? This action cannot be undone and all associated data will be permanently removed.`,
-      variant: "destructive",
-      onConfirm: async () => {
-        try {
-          await deleteElection(id);
-          toast.success("Election deleted successfully!");
-        } catch (error) {
-          toast.error("Failed to delete election");
-        }
-      }
-    });
-  };
+	const canActivate = (election: any) => {
+		return election.status === "draft" && election.candidates && election.candidates.length >= 2;
+	};
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "draft": return "secondary";
-      case "active": return "default";
-      case "completed": return "outline";
-      case "cancelled": return "destructive";
-      default: return "secondary";
-    }
-  };
+	const canForceStart = (election: any) => {
+		return election.status === "draft" && election.candidates && election.candidates.length >= 1;
+	};
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short", 
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
+	const handleStatusChange = async (electionId: string, newStatus: any) => {
+		try {
+			await changeElectionStatus({ id: electionId, status: newStatus });
+		} catch (error) {
+			console.error("Failed to change status:", error);
+		}
+	};
 
-  const handleShareVotingBooth = async (election: any) => {
-    const votingUrl = `${window.location.origin}/vote?booth=${election.voting_booth_id}`
-    
-    try {
-      await navigator.clipboard.writeText(votingUrl)
-      toast.success("Voting booth URL copied to clipboard!")
-    } catch (error) {
-      // Fallback for browsers that don't support clipboard API
-      const textArea = document.createElement('textarea')
-      textArea.value = votingUrl
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      toast.success("Voting booth URL copied to clipboard!")
-    }
-  };
+	const handleDelete = async () => {
+		if (!deleteDialog.election) return;
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <Icon icon="solar:refresh-outline" className="w-8 h-8 animate-spin" />
-        </div>
-      </div>
-    );
-  }
+		try {
+			await deleteElection(deleteDialog.election.id);
+			setDeleteDialog({ open: false, election: null });
+		} catch (error) {
+			console.error("Failed to delete election:", error);
+		}
+	};
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Elections Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Create and manage student elections
-          </p>
-        </div>
-        <Button 
-          className="w-full sm:w-auto"
-          onClick={() => router.push("/elections/create")}
-        >
-          <Icon icon="solar:add-circle-outline" className="w-4 h-4 mr-2" />
-          Create Election
-        </Button>
-      </div>
+	if (viewState === "create") {
+		return (
+			<div className="space-y-6">
+				<div className="flex items-center gap-4">
+					<Button variant="ghost" onClick={handleBackToList} className="flex items-center gap-2">
+						<ArrowLeft className="w-4 h-4" />
+						Back to Elections
+					</Button>
+					<h1 className="text-3xl font-bold">Create New Election</h1>
+				</div>
+				<ElectionForm onSuccess={handleBackToList} onCancel={handleBackToList} />
+			</div>
+		);
+	}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Icon icon="solar:document-text-outline" className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total Elections</p>
-                <p className="text-2xl font-bold">{stats?.total || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Icon icon="solar:play-circle-outline" className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold">{stats?.active || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+	if (viewState === "edit" && editingElectionId) {
+		const editingElection = elections.find((e) => e.id === editingElectionId);
 
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Icon icon="solar:file-text-outline" className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Draft</p>
-                <p className="text-2xl font-bold">{stats?.draft || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+		return (
+			<div className="space-y-6">
+				<div className="flex items-center gap-4">
+					<Button variant="ghost" onClick={handleBackToList} className="flex items-center gap-2">
+						<ArrowLeft className="w-4 h-4" />
+						Back to Elections
+					</Button>
+					<h1 className="text-3xl font-bold">Edit Election</h1>
+				</div>
+				{editingElection ? (
+					<ElectionForm initialData={editingElection} onSuccess={handleBackToList} onCancel={handleBackToList} />
+				) : (
+					<div className="text-center py-8">
+						<p className="text-muted-foreground">Election not found</p>
+						<Button onClick={handleBackToList} className="mt-4">
+							Back to Elections
+						</Button>
+					</div>
+				)}
+			</div>
+		);
+	}
 
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <Icon icon="solar:check-circle-outline" className="w-6 h-6 text-gray-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">{stats?.completed || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+	return (
+		<div className="space-y-8">
+			{/* Clean Header */}
+			<div className="flex items-center justify-between">
+				<div>
+					<h1 className="text-4xl font-bold text-foreground">Elections</h1>
+					<p className="text-lg text-muted-foreground mt-2">Manage your elections and voting campaigns</p>
+				</div>
+				<Button
+					onClick={handleCreateNew}
+					size="lg"
+					className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200"
+				>
+					<Plus className="w-5 h-5 mr-2" />
+					Create Election
+				</Button>
+			</div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Elections</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Input
-                placeholder="Search elections..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+			{/* Error Messages */}
+			{(deleteError || statusError) && (
+				<Alert variant="destructive">
+					<AlertDescription>{deleteError || statusError}</AlertDescription>
+				</Alert>
+			)}
 
-          {/* Elections List */}
-          <div className="space-y-4">
-            {filteredElections.map((election) => (
-              <Card key={election.id} className="border-l-4 border-l-blue-500">
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold">{election.title}</h3>
-                        <Badge variant={getStatusColor(election.status)}>
-                          {election.status.charAt(0).toUpperCase() + election.status.slice(1)}
-                        </Badge>
-                        {election.auto_start && (
-                          <Badge variant="outline">Auto Start</Badge>
-                        )}
-                        {election.allow_multiple_votes && (
-                          <Badge variant="outline">Multiple Votes</Badge>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground">{election.description}</p>
-                      <div className="flex flex-col sm:flex-row gap-2 text-sm text-muted-foreground">
-                        <span>
-                          <Icon icon="solar:calendar-outline" className="w-4 h-4 inline mr-1" />
-                          Start: {formatDate(election.start_date)}
-                        </span>
-                        <span>
-                          <Icon icon="solar:calendar-outline" className="w-4 h-4 inline mr-1" />
-                          End: {formatDate(election.end_date)}
-                        </span>
-                        {isElectionInPast(election) && (
-                          <Badge variant="secondary" className="text-xs bg-gray-200">
-                            <Icon icon="solar:history-outline" className="w-3 h-3 mr-1" />
-                            Past Election
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => router.push(`/elections/view/${election.id}`)}
-                      >
-                        <Icon icon="solar:eye-outline" className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
+			{/* Elections Grid */}
+			{isLoading ? (
+				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+					{Array.from({ length: 6 }).map((_, i) => (
+						<Card key={i} className="animate-pulse">
+							<CardHeader>
+								<div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+								<div className="h-4 bg-muted rounded w-1/2"></div>
+							</CardHeader>
+							<CardContent>
+								<div className="space-y-3">
+									<div className="h-4 bg-muted rounded w-full"></div>
+									<div className="h-4 bg-muted rounded w-2/3"></div>
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+			) : elections.length === 0 ? (
+				<Card className="py-16">
+					<CardContent className="text-center">
+						<Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-6" />
+						<h3 className="text-xl font-semibold text-foreground mb-2">No Elections Yet</h3>
+						<p className="text-muted-foreground mb-6">Get started by creating your first election campaign</p>
+						<Button onClick={handleCreateNew} size="lg">
+							<Plus className="w-5 h-5 mr-2" />
+							Create Your First Election
+						</Button>
+					</CardContent>
+				</Card>
+			) : (
+				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+					{elections.map((election) => (
+						<Card
+							key={election.id}
+							className="group hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/30"
+						>
+							<CardHeader className="pb-4">
+								<div className="flex items-start justify-between">
+									<div className="flex-1">
+										<CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">
+											{election.title}
+										</CardTitle>
+										<Badge className={`px-3 py-1 font-medium ${getStatusColor(election.status)}`}>
+											{election.status.charAt(0).toUpperCase() + election.status.slice(1)}
+										</Badge>
+									</div>
+								</div>
+								{election.description && (
+									<p className="text-muted-foreground text-sm leading-relaxed mt-3">{election.description}</p>
+								)}
+							</CardHeader>
 
-                      {election.status === "active" && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleShareVotingBooth(election)}
-                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                        >
-                          <Icon icon="solar:share-outline" className="w-4 h-4 mr-2" />
-                          Share Booth
-                        </Button>
-                      )}
-                      
-                      {(election.status === "draft" || election.status === "active") && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => router.push(`/elections/edit/${election.id}`)}
-                        >
-                          <Icon icon="solar:pen-outline" className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                      )}
+							<CardContent className="space-y-4">
+								{/* Election Info */}
+								<div className="space-y-3 text-sm">
+									<div className="flex items-center gap-2 text-muted-foreground">
+										<Calendar className="w-4 h-4" />
+										<span>
+											{format(new Date(election.start_date), "MMM dd")} -{" "}
+											{format(new Date(election.end_date), "MMM dd, yyyy")}
+										</span>
+									</div>
+									<div className="flex items-center gap-2 text-muted-foreground">
+										<Users className="w-4 h-4" />
+										<span>{election.candidates?.length || 0} candidates</span>
+									</div>
+									<div className="flex items-center gap-2">
+										<Badge variant="outline" className="text-xs">
+											{election.category}
+										</Badge>
+									</div>
+								</div>
 
-                      {election.status === "draft" && (
-                        <>
-                          {canStartElection(election) ? (
-                            <Button 
-                              size="sm"
-                              onClick={() => handleStartElection(election.id, election.title)}
-                              disabled={isStarting}
-                            >
-                              <Icon icon="solar:play-outline" className="w-4 h-4 mr-2" />
-                              Start
-                            </Button>
-                          ) : isElectionInPast(election) ? (
-                            <div className="flex flex-col items-start gap-1">
-                              <Button 
-                                size="sm"
-                                disabled
-                                variant="outline"
-                                className="opacity-50"
-                              >
-                                <Icon icon="solar:history-outline" className="w-4 h-4 mr-2" />
-                                Cannot Start
-                              </Button>
-                              <span className="text-xs text-muted-foreground">
-                                This election has already ended
-                              </span>
-                            </div>
-                          ) : null}
-                        </>
-                      )}
+								{/* Action Buttons */}
+								<div className="flex gap-2 pt-2">
+									<Button variant="outline" size="sm" onClick={() => handleEdit(election.id)} className="flex-1">
+										<Edit className="w-4 h-4 mr-1" />
+										Edit
+									</Button>
 
-                      {election.status === "active" && (
-                        <Button 
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleStopElection(election.id, election.title)}
-                          disabled={isStopping}
-                        >
-                          <Icon icon="solar:stop-outline" className="w-4 h-4 mr-2" />
-                          Stop
-                        </Button>
-                      )}
+									{/* Status Control Buttons */}
+									{election.status === "draft" && canActivate(election) && (
+										<Button
+											size="sm"
+											onClick={() => handleStatusChange(election.id, "active")}
+											disabled={isChangingStatus}
+											className="bg-green-600 hover:bg-green-700"
+										>
+											<Play className="w-4 h-4 mr-1" />
+											Start
+										</Button>
+									)}
 
-                      {(election.status === "draft" || election.status === "completed") && (
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteElection(election.id, election.title)}
-                          disabled={isDeleting}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Icon icon="solar:trash-bin-minimalistic-outline" className="w-4 h-4 mr-2" />
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+									{election.status === "draft" && canForceStart(election) && !canActivate(election) && (
+										<Button
+											size="sm"
+											onClick={() => handleStatusChange(election.id, "active")}
+											disabled={isChangingStatus}
+											className="bg-orange-600 hover:bg-orange-700"
+											title="Force start (requires at least 1 candidate)"
+										>
+											<Zap className="w-4 h-4 mr-1" />
+											Force Start
+										</Button>
+									)}
 
-          {filteredElections.length === 0 && (
-            <div className="text-center py-12">
-              <Icon icon="solar:file-search-outline" className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No elections found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter !== "all" 
-                  ? "Try adjusting your search or filters"
-                  : "Get started by creating your first election"
-                }
-              </p>
-              {!searchTerm && statusFilter === "all" && (
-                <Button onClick={() => router.push("/elections/create")}>
-                  <Icon icon="solar:add-circle-outline" className="w-4 h-4 mr-2" />
-                  Create Election
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+									{election.status === "active" && (
+										<Button
+											size="sm"
+											onClick={() => handleStatusChange(election.id, "completed")}
+											disabled={isChangingStatus}
+											className="bg-red-600 hover:bg-red-700"
+										>
+											<Square className="w-4 h-4 mr-1" />
+											Stop
+										</Button>
+									)}
 
+									{election.status === "draft" && (
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setDeleteDialog({ open: true, election })}
+											disabled={isDeleting}
+											className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+										>
+											<Trash2 className="w-4 h-4" />
+										</Button>
+									)}
+								</div>
 
-      {/* Confirmation Dialog */}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
-        title={confirmDialog.title}
-        description={confirmDialog.description}
-        onConfirm={confirmDialog.onConfirm}
-        variant={confirmDialog.variant}
-        isLoading={isStarting || isStopping || isDeleting}
-        confirmText={
-          confirmDialog.title.includes("Delete") ? "Delete" :
-          confirmDialog.title.includes("Stop") ? "Stop" : "Start"
-        }
-      />
-    </div>
-  );
+								{/* Status Messages */}
+								{election.status === "draft" && (!election.candidates || election.candidates.length < 2) && (
+									<div className="text-xs text-amber-600 bg-amber-50 p-2 rounded flex items-center gap-2">
+										<Clock className="w-3 h-3" />
+										{!election.candidates || election.candidates.length === 0
+											? "Add candidates to start election"
+											: "Add at least 2 candidates for normal start"}
+									</div>
+								)}
+							</CardContent>
+						</Card>
+					))}
+				</div>
+			)}
+
+			{/* Delete Confirmation */}
+			<Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, election: null })}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Election</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete "{deleteDialog.election?.title}"? This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => setDeleteDialog({ open: false, election: null })}
+							disabled={isDeleting}
+						>
+							Cancel
+						</Button>
+						<Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+							{isDeleting ? "Deleting..." : "Delete Election"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
 }

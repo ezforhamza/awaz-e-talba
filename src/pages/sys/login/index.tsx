@@ -1,4 +1,4 @@
-import PlaceholderImg from "@/assets/images/background/placeholder.svg";
+import HeroImg from "@/assets/icons/hero.jpg";
 import LocalePicker from "@/components/locale-picker";
 import Logo from "@/components/logo";
 import { GLOBAL_CONFIG } from "@/global-config";
@@ -42,7 +42,16 @@ function LoginPage() {
 			</div>
 
 			<div className="relative hidden bg-background-paper lg:block">
-				<img src={PlaceholderImg} alt="placeholder img" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.5] dark:grayscale" />
+				<img
+					src={HeroImg}
+					alt="Awaz-e-Talba - Student Voting System"
+					className="absolute inset-0 h-full w-full object-cover"
+				/>
+				<div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+				<div className="absolute bottom-8 left-8 right-8 text-white">
+					<h2 className="text-3xl font-bold mb-2">Awaz-e-Talba</h2>
+					<p className="text-lg opacity-90">Empowering student voices through secure, transparent elections</p>
+				</div>
 			</div>
 
 			<div className="absolute right-2 top-0 flex flex-row">

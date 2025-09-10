@@ -7,6 +7,8 @@ const Page403 = lazy(() => import("@/pages/sys/error/Page403"));
 const Page404 = lazy(() => import("@/pages/sys/error/Page404"));
 const Page500 = lazy(() => import("@/pages/sys/error/Page500"));
 const VotePage = lazy(() => import("@/pages/vote"));
+const VoteEntryPage = lazy(() => import("@/pages/vote-entry"));
+const VoteBoothPage = lazy(() => import("@/pages/vote-booth"));
 
 export const mainRoutes: RouteObject[] = [
 	// Standalone voting page (no layout) - supports booth parameter
@@ -15,6 +17,24 @@ export const mainRoutes: RouteObject[] = [
 		element: (
 			<Suspense fallback={<LineLoading />}>
 				<VotePage />
+			</Suspense>
+		),
+	},
+	// Voting entry page - for entering voting ID
+	{
+		path: "/vote-entry",
+		element: (
+			<Suspense fallback={<LineLoading />}>
+				<VoteEntryPage />
+			</Suspense>
+		),
+	},
+	// Voting booth page - for actual voting
+	{
+		path: "/vote-booth",
+		element: (
+			<Suspense fallback={<LineLoading />}>
+				<VoteBoothPage />
 			</Suspense>
 		),
 	},
